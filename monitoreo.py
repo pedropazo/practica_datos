@@ -1,11 +1,9 @@
 import subprocess
 import sqlite3
-import time
 
-# 1. Configuración de la Base de Datos
+# 1. Conexión a la base de datos
 conexion = sqlite3.connect("red.db")
 cursor = conexion.cursor()
-
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS monitoreo (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14,29 +12,21 @@ cursor.execute("""
         latencia REAL
     )
 """)
-conexion.commit()
 
-# 2. Lógica del Ping y Extracción de Datos
-ip_objetivo = "192.168.4.27" # Tu IP
+# 2. Ejecutar ping
+ip_objetivo = "192.168.4.27"
+res = subprocess.run(["ping", "-c", "1", ip_objetivo], capture_output=True, text=True)
 
-def registrar_ping():
-    res = subprocess.run(["ping", "-c", "1", ip_objetivo], capture_output=True, text=True)
+if res.returncode == 0:
+    # 3. Limpieza de datos (extraer el tiempo)
+    linea_tiempo = res.stdout.splitlines()[1]
+    palabra_tiempo = linea_tiempo.split()[6]
+    valor_latencia = float(palabra_tiempo.replace("time=", ""))
     
-    if res.returncode == 0:
-        # Extraemos el tiempo (Posición 6 después del split)
-        linea_tiempo = res.stdout.splitlines()[1]
-        palabra_tiempo = linea_tiempo.split()[6]
-        valor_latencia = float(palabra_tiempo.replace("time=", ""))
-        
-        # 3. Guardado en Base de Datos
-        cursor.execute("INSERT INTO monitoreo (ip, latencia) VALUES (?, ?)", (ip_objetivo, valor_latencia))
-        conexion.commit()
-        print(f"✅ Guardado: {valor_latencia} ms")
-    else:
-        print("❌ Error en el ping")
-
-# Ejecutamos una prueba
-registrar_ping()
-
-# 4. Conteo de registros (Tu próximo paso)
-# resultado = cursor.execute("SELECT ...").fetchone()[0]
+    # 4. Insertar en la base de datos
+    cursor.execute("INSERT INTO monitoreo (ip, latencia) VALUES (?, ?)", (ip_objetivo, valor_latencia))
+    conexion.commit()
+    
+    # 5. Contar registros totales
+    total = cursor.execute("SELECT COUNT(*) FROM monitoreo").fetchone()[0]
+    print(f"✅ Guardado: {valor_latencia} ms. Total registros: {total}")
